@@ -3,3 +3,5 @@ Projeto realizado para compreender a estrutura de dados em árvore, na qual esco
 
 
 ## Comando de compilação 
+`gcc $(pkg-config --cflags gtk4) -o crud_project crud_project.c $(pkg-config --libs gtk4) -std=c11 -Wall -Wextra`
+
