@@ -57,3 +57,5 @@ dkms.conf
 
 .vscode
 crud_project
+crud_project2
+*.txt

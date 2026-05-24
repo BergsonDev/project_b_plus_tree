@@ -1,138 +1,4 @@
-/*
- * ===========================================================================
- *  TEMPLATE GTK 4 — CRUD VISUAL EM C PURO (PADRÃO MVC)
- *  Compilador: GCC estrito (sem g++, sem extensões C++)
- *  Padrão:     C11 (-std=c11)
- *  Dependência: GTK 4
- *
- *  ANALOGIA WEB RÁPIDA:
- *  ┌─────────────────────────────────────────────────────┐
- *  │  GTK / C               │  Web (HTML/CSS/JS)         │
- *  ├─────────────────────────────────────────────────────│
- *  │  GtkWidget*            │  Elemento DOM (HTMLElement) │
- *  │  GtkApplication        │  O próprio navegador/runtime│
- *  │  GtkWindow             │  <body> / janela do browser │
- *  │  GtkBox                │  <div style="display:flex"> │
- *  │  GtkButton             │  <button>                   │
- *  │  GtkEntry              │  <input type="text">        │
- *  │  GtkLabel              │  <span> / <label>           │
- *  │  GtkListBox            │  <ul> / <table>             │
- *  │  GtkListBoxRow         │  <li> / <tr>                │
- *  │  GtkScrolledWindow     │  overflow: scroll           │
- *  │  g_signal_connect()    │  addEventListener()         │
- *  │  activate (sinal)      │  DOMContentLoaded           │
- *  │  clicked (sinal)       │  click event                │
- *  └─────────────────────────────────────────────────────┘
- *
- *  CICLO DE VIDA DOS WIDGETS (análogo ao DOM):
- *  - gtk_application_window_new() → document.createElement() + appendChild()
- *  - gtk_widget_set_visible(FALSE) → elemento.style.display = 'none'
- *  - g_object_unref() → elemento.remove() / GC do JS (mas EXPLÍCITO em C)
- *
- *  COMPILAÇÃO (Linux e MSYS2/MinGW no Windows 11):
- *  gcc $(pkg-config --cflags gtk4) -o crud_gtk4 crud_gtk4.c $(pkg-config --libs gtk4) -std=c11 -Wall -Wextra
- * ===========================================================================
- */
-
-#include <gtk/gtk.h>
-#include <string.h>
-#include <stdlib.h>
-
-/* ===========================================================================
- *  SEÇÃO 1 — MODEL
- *  Representa os dados da aplicação. Substitua por sua struct real e funções
- *  de persistência (arquivo, SQLite, rede, etc.).
- *  Analogia Web: é o "estado" (state) da aplicação React/Vue, ou o objeto
- *  JSON que viria de uma API REST.
- * ===========================================================================*/
-
-#define MAX_REGISTROS 256
-#define MAX_CAMPO     128
-
-typedef struct {
-    int  id;
-    char nome[MAX_CAMPO];
-    char email[MAX_CAMPO];
-} Registro;
-
-/* Armazenamento em memória — substitua por chamadas ao seu backend */
-static Registro tabela[MAX_REGISTROS];
-static int      total_registros = 0;
-static int      proximo_id      = 1;
-
-/* --- Funções do Model (stubs — implemente sua lógica aqui) --- */
-
-/*
- * model_listar_todos:
- *   Preenche 'saida' com os registros existentes e retorna a quantidade.
- *   PONTEIROS: 'saida' aponta para memória já alocada pelo chamador.
- *              Nunca faça free() aqui; quem aloca, desaloca.
- */
-static int model_listar_todos(Registro *saida, int capacidade)
-{
-    int copiados = (total_registros < capacidade) ? total_registros : capacidade;
-    memcpy(saida, tabela, (size_t)copiados * sizeof(Registro));
-    return copiados;
-}
-
-/*
- * model_inserir:
- *   Adiciona um novo registro. Retorna o ID gerado ou -1 em caso de erro.
- *   PONTEIROS: nome e email são strings literais ou buffers do chamador;
- *              copiamos com strncpy para evitar dependência do ponteiro externo.
- */
-static int model_inserir(const char *nome, const char *email)
-{
-    if (total_registros >= MAX_REGISTROS) return -1;
-
-    Registro *r = &tabela[total_registros];
-    r->id = proximo_id++;
-    strncpy(r->nome,  nome,  MAX_CAMPO - 1);
-    strncpy(r->email, email, MAX_CAMPO - 1);
-    r->nome[MAX_CAMPO - 1]  = '\0';  /* garante terminação nula */
-    r->email[MAX_CAMPO - 1] = '\0';
-    total_registros++;
-    return r->id;
-}
-
-/*
- * model_remover:
- *   Remove pelo ID. Compacta o array (sem buracos).
- *   Retorna 1 se removeu, 0 se não encontrou.
- */
-static int model_remover(int id)
-{
-    for (int i = 0; i < total_registros; i++) {
-        if (tabela[i].id == id) {
-            /* Desloca elementos à esquerda — sem malloc/free */
-            memmove(&tabela[i], &tabela[i + 1],
-                    (size_t)(total_registros - i - 1) * sizeof(Registro));
-            total_registros--;
-            return 1;
-        }
-    }
-    return 0;
-}
-
-/*
- * model_editar:
- *   Atualiza nome e email de um registro existente pelo ID.
- *   Retorna 1 se editou, 0 se não encontrou.
- */
-static int model_editar(int id, const char *novo_nome, const char *novo_email)
-{
-    for (int i = 0; i < total_registros; i++) {
-        if (tabela[i].id == id) {
-            strncpy(tabela[i].nome,  novo_nome,  MAX_CAMPO - 1);
-            strncpy(tabela[i].email, novo_email, MAX_CAMPO - 1);
-            tabela[i].nome[MAX_CAMPO - 1]  = '\0';
-            tabela[i].email[MAX_CAMPO - 1] = '\0';
-            return 1;
-        }
-    }
-    return 0;
-}
-
+#include "model.h"
 
 /* ===========================================================================
  *  SEÇÃO 2 — VIEW STATE
@@ -155,8 +21,10 @@ typedef struct {
     GtkWidget *lista_box;        /* GtkListBox — o container */
 
     /* Campos de formulário (análogo a <input type="text">) */
-    GtkWidget *entry_nome;
-    GtkWidget *entry_email;
+    GtkWidget *entry_name;
+    GtkWidget *entry_code;
+    GtkWidget *entry_brandName;
+    GtkWidget *entry_quantity;
 
     /* Botões de ação (análogo a <button>) */
     GtkWidget *btn_inserir;
@@ -177,7 +45,7 @@ typedef struct {
  * ===========================================================================*/
 
 /*
- * view_atualizar_lista:
+ * viewListAllProducts:
  *   Recria todas as linhas do GtkListBox a partir do Model.
  *
  *   Analogia Web: é o equivalente a limpar um <ul> com innerHTML = ''
@@ -187,7 +55,7 @@ typedef struct {
  *   de propriedade (não faça unref). gtk_list_box_remove_all() é GTK 4.8+;
  *   para versões anteriores usamos o loop abaixo.
  */
-static void view_atualizar_lista(AppWidgets *w)
+static void viewListAllProducts(AppWidgets *w)
 {
     /* Remove todas as linhas existentes do GtkListBox */
     GtkWidget *filho;
@@ -196,8 +64,8 @@ static void view_atualizar_lista(AppWidgets *w)
     }
 
     /* Busca os dados no Model */
-    Registro buf[MAX_REGISTROS];
-    int n = model_listar_todos(buf, MAX_REGISTROS);
+    Products buf[MAX_PRODUCT];
+    int n = allProducts(buf, MAX_PRODUCT);
 
     /* Cria uma linha GTK para cada registro */
     for (int i = 0; i < n; i++) {
@@ -212,9 +80,9 @@ static void view_atualizar_lista(AppWidgets *w)
         gtk_widget_set_margin_bottom(linha, 4);
 
         /* Formata o texto da linha */
-        char texto[MAX_CAMPO * 2 + 32];
-        snprintf(texto, sizeof(texto), "[ID: %d]  %s  —  %s",
-                 buf[i].id, buf[i].nome, buf[i].email);
+        char texto[MAX_STR * 2 + 32];
+        snprintf(texto, sizeof(texto), "ID : %d/ Nome : %s/Código: %s / Marca : %s / Quantidade : %d",
+                 buf[i].id, buf[i].name, buf[i].code, buf[i].brandName, buf[i].quantity);
 
         /* GtkLabel — análogo a <span> */
         GtkWidget *lbl = gtk_label_new(texto);
@@ -249,10 +117,10 @@ static void view_set_status(AppWidgets *w, const char *msg)
 }
 
 /* Limpa os campos de entrada (análogo a form.reset()) */
-static void view_limpar_form(AppWidgets *w)
+static void viewClearForm(AppWidgets *w)
 {
-    gtk_editable_set_text(GTK_EDITABLE(w->entry_nome),  "");
-    gtk_editable_set_text(GTK_EDITABLE(w->entry_email), "");
+    gtk_editable_set_text(GTK_EDITABLE(w->entry_name),  "");
+    gtk_editable_set_text(GTK_EDITABLE(w->entry_code), "");
     w->id_selecionado = -1;
 }
 
@@ -270,45 +138,47 @@ static void view_limpar_form(AppWidgets *w)
  * ===========================================================================*/
 
 /*
- * on_btn_inserir_clicked:
+ * onBtnInsertClick:
  *   Lê os campos, chama o Model para inserir e atualiza a View.
  *   ➜ INJETE SUA LÓGICA DE VALIDAÇÃO E PERSISTÊNCIA AQUI.
  */
-static void on_btn_inserir_clicked(GtkWidget *widget, gpointer user_data)
+static void onBtnInsertClick(GtkWidget *widget, gpointer user_data)
 {
     (void)widget; /* suprime warning de parâmetro não usado */
     AppWidgets *w = (AppWidgets *)user_data;
 
     /* gtk_editable_get_text retorna const char* — pertence ao widget, NÃO faça free() */
-    const char *nome  = gtk_editable_get_text(GTK_EDITABLE(w->entry_nome));
-    const char *email = gtk_editable_get_text(GTK_EDITABLE(w->entry_email));
+    const char *name  = gtk_editable_get_text(GTK_EDITABLE(w->entry_name));
+    const char *code = gtk_editable_get_text(GTK_EDITABLE(w->entry_code));
+    const char *brandName = gtk_editable_get_text(GTK_EDITABLE(w->entry_brandName));
+    const int quantity = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w->entry_quantity));
 
     /* --- PONTO DE INJEÇÃO: validação de input --- */
-    if (nome[0] == '\0' || email[0] == '\0') {
+    if (name[0] == '\0' || code[0] == '\0' || brandName[0] == '\0') {
         view_set_status(w, "⚠ Preencha todos os campos.");
         return;
     }
 
     /* --- PONTO DE INJEÇÃO: persistência (DB, arquivo, API) --- */
-    int novo_id = model_inserir(nome, email);
+    int novo_id = insertProduct(name, code, brandName, quantity);
 
     if (novo_id > 0) {
         char msg[64];
-        snprintf(msg, sizeof(msg), "✔ Inserido com ID %d.", novo_id);
+        snprintf(msg, sizeof(msg), "Inserido com ID %d.", novo_id);
         view_set_status(w, msg);
-        view_limpar_form(w);
-        view_atualizar_lista(w);
+        viewClearForm(w);
+        viewListAllProducts(w);
     } else {
-        view_set_status(w, "✖ Erro ao inserir: capacidade máxima atingida.");
+        view_set_status(w, "Erro ao inserir: capacidade máxima atingida.");
     }
 }
 
 /*
- * on_btn_remover_clicked:
+ * onBtnRemoveClick:
  *   Remove o registro com id_selecionado.
  *   ➜ INJETE SUA LÓGICA DE CONFIRMAÇÃO E PERSISTÊNCIA AQUI.
  */
-static void on_btn_remover_clicked(GtkWidget *widget, gpointer user_data)
+static void onBtnRemoveClick(GtkWidget *widget, gpointer user_data)
 {
     (void)widget;
     AppWidgets *w = (AppWidgets *)user_data;
@@ -320,49 +190,51 @@ static void on_btn_remover_clicked(GtkWidget *widget, gpointer user_data)
 
     /* --- PONTO DE INJEÇÃO: confirmação (ex.: GtkAlertDialog) --- */
     /* --- PONTO DE INJEÇÃO: persistência                       --- */
-    int removido = model_remover(w->id_selecionado);
+    int removido = removeProduct(w->id_selecionado);
 
     if (removido) {
-        view_set_status(w, "✔ Registro removido.");
-        view_limpar_form(w);
-        view_atualizar_lista(w);
+        view_set_status(w, "Registro removido.");
+        viewClearForm(w);
+        viewListAllProducts(w);
     } else {
-        view_set_status(w, "✖ Registro não encontrado.");
+        view_set_status(w, "Registro não encontrado.");
     }
 }
 
 /*
- * on_btn_editar_clicked:
+ * onBtnUpdateClick:
  *   Atualiza o registro selecionado com os valores dos campos.
  *   ➜ INJETE SUA LÓGICA DE VALIDAÇÃO E PERSISTÊNCIA AQUI.
  */
-static void on_btn_editar_clicked(GtkWidget *widget, gpointer user_data)
+static void onBtnUpdateClick(GtkWidget *widget, gpointer user_data)
 {
     (void)widget;
     AppWidgets *w = (AppWidgets *)user_data;
 
     if (w->id_selecionado < 0) {
-        view_set_status(w, "⚠ Selecione um item na lista para editar.");
+        view_set_status(w, "Selecione um item na lista para editar.");
         return;
     }
 
-    const char *nome  = gtk_editable_get_text(GTK_EDITABLE(w->entry_nome));
-    const char *email = gtk_editable_get_text(GTK_EDITABLE(w->entry_email));
+    const char *name  = gtk_editable_get_text(GTK_EDITABLE(w->entry_name));
+    const char *code = gtk_editable_get_text(GTK_EDITABLE(w->entry_code));    
+    const char *brandName = gtk_editable_get_text(GTK_EDITABLE(w->entry_brandName));
+    const int quantity = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w->entry_quantity));
 
     /* --- PONTO DE INJEÇÃO: validação e persistência --- */
-    if (nome[0] == '\0' || email[0] == '\0') {
+    if (name[0] == '\0' || code[0] == '\0' || brandName[0] == '\0') {
         view_set_status(w, "⚠ Preencha todos os campos para editar.");
         return;
     }
 
-    int ok = model_editar(w->id_selecionado, nome, email);
+    int ok = editProduct(w->id_selecionado, name, code, brandName, quantity);
 
     if (ok) {
-        view_set_status(w, "✔ Registro atualizado.");
-        view_limpar_form(w);
-        view_atualizar_lista(w);
+        view_set_status(w, "Registro atualizado.");
+        viewClearForm(w);
+        viewListAllProducts(w);
     } else {
-        view_set_status(w, "✖ Falha ao editar: ID não encontrado.");
+        view_set_status(w, "Falha ao editar: ID não encontrado.");
     }
 }
 
@@ -396,12 +268,14 @@ static void on_row_selected(GtkListBox *lista, GtkListBoxRow *row,
     w->id_selecionado = id;
 
     /* Preenche os campos de formulário com os dados do registro selecionado */
-    Registro buf[MAX_REGISTROS];
-    int n = model_listar_todos(buf, MAX_REGISTROS);
+    Products buf[MAX_PRODUCT];
+    int n = allProducts(buf, MAX_PRODUCT);
     for (int i = 0; i < n; i++) {
         if (buf[i].id == id) {
-            gtk_editable_set_text(GTK_EDITABLE(w->entry_nome),  buf[i].nome);
-            gtk_editable_set_text(GTK_EDITABLE(w->entry_email), buf[i].email);
+            gtk_editable_set_text(GTK_EDITABLE(w->entry_name),  buf[i].name);
+            gtk_editable_set_text(GTK_EDITABLE(w->entry_code), buf[i].code);
+            gtk_editable_set_text(GTK_EDITABLE(w->entry_brandName), buf[i].brandName);
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(w->entry_quantity), buf[i].quantity);
             break;
         }
     }
@@ -433,8 +307,8 @@ static void on_row_selected(GtkListBox *lista, GtkListBoxRow *row,
  *       │   └── GtkListBox (lista de registros)
  *       ├── GtkSeparator
  *       ├── GtkBox horizontal (formulário)
- *       │   ├── GtkEntry (nome)
- *       │   └── GtkEntry (email)
+ *       │   ├── GtkEntry (name)
+ *       │   └── GtkEntry (code)
  *       ├── GtkBox horizontal (botões)
  *       │   ├── GtkButton (Inserir)
  *       │   ├── GtkButton (Editar)
@@ -459,7 +333,7 @@ static void build_ui(GtkApplication *app, gpointer user_data)
 
     /* ----- Janela principal ----- */
     w->janela = gtk_application_window_new(app);
-    gtk_window_set_title(GTK_WINDOW(w->janela), "CRUD GTK 4 — Template MVC");
+    gtk_window_set_title(GTK_WINDOW(w->janela), "Estoque em Árvore Binária em C com GTK 4 — Template MVC");
     gtk_window_set_default_size(GTK_WINDOW(w->janela), 700, 520);
 
     /* ----- Container raiz vertical (análogo a <div class="flex flex-col">) ----- */
@@ -520,17 +394,38 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     GtkWidget *hbox_form = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_append(GTK_BOX(vbox_raiz), hbox_form);
 
-    /* Campo Nome (análogo a <input type="text" placeholder="Nome"> */
-    w->entry_nome = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_nome), "Nome");
-    gtk_widget_set_hexpand(w->entry_nome, TRUE);
-    gtk_box_append(GTK_BOX(hbox_form), w->entry_nome);
+    /* Campo name (análogo a <input type="text" placeholder="name"> */
+    w->entry_name = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_name), "name");
+    gtk_widget_set_hexpand(w->entry_name, TRUE);
+    gtk_box_append(GTK_BOX(hbox_form), w->entry_name);
 
     /* Campo E-mail */
-    w->entry_email = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_email), "E-mail");
-    gtk_widget_set_hexpand(w->entry_email, TRUE);
-    gtk_box_append(GTK_BOX(hbox_form), w->entry_email);
+    w->entry_code = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_code), "E-mail");
+    gtk_widget_set_hexpand(w->entry_code, TRUE);
+    gtk_box_append(GTK_BOX(hbox_form), w->entry_code);    
+    
+    
+    /* Campo Brand Name */
+    w->entry_brandName = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_brandName), "Marca");
+    gtk_widget_set_hexpand(w->entry_brandName, TRUE);
+    gtk_box_append(GTK_BOX(hbox_form), w->entry_brandName);
+    
+
+
+    // 1. Criamos o input definindo: (valor_mínimo, valor_máximo, passo_do_incremento)
+    // Exemplo: vai de 0 a 999, e aumenta de 1 em 1 a cada clique no "+"
+    w->entry_quantity = gtk_spin_button_new_with_range(0, 999, 1);
+    // 2. (Opcional) Configurações extras de comportamento:
+    // Garante que o usuário só consiga digitar números (bloqueia letras se ele tentar digitar)
+    gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(w->entry_quantity), TRUE);
+    // Faz o campo ser "clonado" ou atualizado apenas com valores inteiros (sem casas decimais)
+    gtk_spin_button_set_digits(GTK_SPIN_BUTTON(w->entry_quantity), 0);
+    gtk_box_append(GTK_BOX(hbox_form), w->entry_quantity);
+
+
 
     /* ----- Linha de botões ----- */
     GtkWidget *hbox_btns = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -555,20 +450,20 @@ static void build_ui(GtkApplication *app, gpointer user_data)
 
     /*
      * Conecta os sinais dos botões.
-     * g_signal_connect(objeto, "nome-do-sinal", G_CALLBACK(handler), dado_extra)
+     * g_signal_connect(objeto, "name-do-sinal", G_CALLBACK(handler), dado_extra)
      *   ↕ equivalente JS:
-     * objeto.addEventListener("nome-do-sinal", handler)
+     * objeto.addEventListener("name-do-sinal", handler)
      *   (o 'dado_extra' é como fechar sobre variáveis com uma closure JS)
      *
      * PONTEIROS: passamos 'w' como user_data — os callbacks receberão este
      * ponteiro. Ele deve viver enquanto a janela existir (ver on_janela_destroy).
      */
     g_signal_connect(w->btn_inserir, "clicked",
-                     G_CALLBACK(on_btn_inserir_clicked), w);
+                     G_CALLBACK(onBtnInsertClick), w);
     g_signal_connect(w->btn_editar,  "clicked",
-                     G_CALLBACK(on_btn_editar_clicked),  w);
+                     G_CALLBACK(onBtnUpdateClick),  w);
     g_signal_connect(w->btn_remover, "clicked",
-                     G_CALLBACK(on_btn_remover_clicked), w);
+                     G_CALLBACK(onBtnRemoveClick), w);
 
     /* Separador antes do status */
     gtk_box_append(GTK_BOX(vbox_raiz), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
@@ -591,7 +486,7 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     g_object_set_data_full(G_OBJECT(w->janela), "app-widgets", w, g_free);
 
     /* Popula a lista inicial e exibe a janela */
-    view_atualizar_lista(w);
+    viewListAllProducts(w);
     gtk_widget_set_visible(w->janela, TRUE);
 }
 
