@@ -119,8 +119,15 @@ static void view_set_status(AppWidgets *w, const char *msg)
 /* Limpa os campos de entrada (análogo a form.reset()) */
 static void viewClearForm(AppWidgets *w)
 {
-    gtk_editable_set_text(GTK_EDITABLE(w->entry_name),  "");
+    gtk_editable_set_text(GTK_EDITABLE(w->entry_name), "");
     gtk_editable_set_text(GTK_EDITABLE(w->entry_code), "");
+    gtk_editable_set_text(GTK_EDITABLE(w->entry_brandName), "");
+
+    gtk_spin_button_set_value(
+        GTK_SPIN_BUTTON(w->entry_quantity),
+        0
+    );
+
     w->id_selecionado = -1;
 }
 

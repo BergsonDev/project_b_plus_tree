@@ -13,6 +13,7 @@
 #include <gtk/gtk.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 // definido nas dependencias para facilitar o controle global
 #define MAX_PRODUCT 256
