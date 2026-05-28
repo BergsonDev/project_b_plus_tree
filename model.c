@@ -29,8 +29,8 @@ VARIÁVEIS GLOBAIS
 =========================================================
 */
 
-static BTreeNode *root = NULL;
-static int next_id = 1;
+ BTreeNode *root = NULL;
+ int next_id = 1;
 
 /*
 =========================================================
@@ -38,7 +38,7 @@ CRIAR NÓ
 =========================================================
 */
 
-static BTreeNode *createNode(int leaf)
+ BTreeNode *createNode(int leaf)
 {
     BTreeNode *node = malloc(sizeof(BTreeNode));
 
@@ -57,7 +57,7 @@ BUSCA NA ÁRVORE-B
 =========================================================
 */
 
-static long searchBTree(BTreeNode *node, int key)
+ long searchBTree(BTreeNode *node, int key)
 {
     if (node == NULL)
         return -1;
@@ -82,7 +82,7 @@ SPLIT DO NÓ
 =========================================================
 */
 
-static void splitChild(BTreeNode *parent,
+ void splitChild(BTreeNode *parent,
                        int index,
                        BTreeNode *child)
 {
@@ -135,7 +135,7 @@ INSERÇÃO EM NÓ NÃO CHEIO
 =========================================================
 */
 
-static void insertNonFull(BTreeNode *node,
+ void insertNonFull(BTreeNode *node,
                           int key,
                           long offset)
 {
@@ -185,7 +185,7 @@ INSERÇÃO NA ÁRVORE-B
 =========================================================
 */
 
-static void insertBTree(int key,
+ void insertBTree(int key,
                         long offset)
 {
     if (root == NULL) {
@@ -235,7 +235,7 @@ PERSISTÊNCIA DA ÁRVORE
 =========================================================
 */
 
-static void saveNode(FILE *fp, BTreeNode *node)
+ void saveNode(FILE *fp, BTreeNode *node)
 {
     if (node == NULL)
         return;
@@ -252,7 +252,7 @@ static void saveNode(FILE *fp, BTreeNode *node)
     }
 }
 
-static void saveTree()
+ void saveTree()
 {
     FILE *fp = fopen(INDEX_FILE, "wb");
 
@@ -269,7 +269,7 @@ static void saveTree()
     fclose(fp);
 }
 
-static BTreeNode *loadNode(FILE *fp)
+ BTreeNode *loadNode(FILE *fp)
 {
     BTreeNode temp;
 
@@ -300,7 +300,7 @@ static BTreeNode *loadNode(FILE *fp)
     return node;
 }
 
-static void loadTree()
+ void loadTree()
 {
     FILE *fp = fopen(INDEX_FILE, "rb");
 
@@ -323,9 +323,9 @@ INICIALIZAÇÃO
 =========================================================
 */
 
-static void initializeSystem()
+ void initializeSystem()
 {
-    static int initialized = 0;
+     int initialized = 0;
 
     if (!initialized) {
 
@@ -335,6 +335,32 @@ static void initializeSystem()
     }
 }
 
+ int updateOffset(BTreeNode *node, int key, long newOffset){
+    if (node == NULL)
+        return 0;
+
+    int i = 0;
+
+    while (i < node->numKeys &&
+           key > node->keys[i])
+    {
+        i++;
+    }
+
+    if (i < node->numKeys &&
+        key == node->keys[i])
+    {
+        node->offsets[i] = newOffset;
+        return 1;
+    }
+
+    if (node->leaf)
+        return 0;
+
+    return updateOffset(node->children[i],
+                        key,
+                        newOffset);
+}
 /*
 =========================================================
 INSERIR PRODUTO
@@ -386,7 +412,7 @@ Products * searchProduct(int id)
 {
     initializeSystem();
 
-    static Products p;
+     Products  * p = (Products *) malloc(sizeof(Products));
 
     long offset = searchBTree(root, id);
 
@@ -412,21 +438,21 @@ Products * searchProduct(int id)
     char *token;
 
     token = strtok(line, "|");
-    p.id = atoi(token);
+    p->id = atoi(token);
 
     token = strtok(NULL, "|");
-    strcpy(p.name, token);
+    strcpy(p->name, token);
 
     token = strtok(NULL, "|");
-    strcpy(p.code, token);
+    strcpy(p->code, token);
 
     token = strtok(NULL, "|");
-    strcpy(p.brandName, token);
+    strcpy(p->brandName, token);
 
     token = strtok(NULL, "|");
-    p.quantity = atoi(token);
+    p->quantity = atoi(token);
 
-    return &p;
+    return p;
 }
 
 /*
@@ -435,7 +461,7 @@ TRAVESSIA ORDENADA
 =========================================================
 */
 
-static void traverseBTree(BTreeNode *node,
+ void traverseBTree(BTreeNode *node,
                           Products *data,
                           int *count,
                           int capacity)
@@ -607,32 +633,3 @@ int editProduct(int id,
     return 1;
 }
 
-static int updateOffset(BTreeNode *node,
-                        int key,
-                        long newOffset)
-{
-    if (node == NULL)
-        return 0;
-
-    int i = 0;
-
-    while (i < node->numKeys &&
-           key > node->keys[i])
-    {
-        i++;
-    }
-
-    if (i < node->numKeys &&
-        key == node->keys[i])
-    {
-        node->offsets[i] = newOffset;
-        return 1;
-    }
-
-    if (node->leaf)
-        return 0;
-
-    return updateOffset(node->children[i],
-                        key,
-                        newOffset);
-}

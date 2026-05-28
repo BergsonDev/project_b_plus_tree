@@ -34,6 +34,11 @@ typedef struct {
     /* Rótulo de status (análogo a um <p id="status">) */
     GtkWidget *label_status;
 
+    /* Pesquisa por ID */
+    GtkWidget *entry_search;    /* campo de texto para o ID */
+    GtkWidget *btn_pesquisar;   /* botão de pesquisa */
+    GtkWidget *label_resultado; /* exibe o resultado da consulta */
+
     /* ID do registro selecionado (-1 = nenhum selecionado) */
     int id_selecionado;
 } AppWidgets;
@@ -155,10 +160,10 @@ static void onBtnInsertClick(GtkWidget *widget, gpointer user_data)
     AppWidgets *w = (AppWidgets *)user_data;
 
     /* gtk_editable_get_text retorna const char* — pertence ao widget, NÃO faça free() */
-    const char *name  = gtk_editable_get_text(GTK_EDITABLE(w->entry_name));
-    const char *code = gtk_editable_get_text(GTK_EDITABLE(w->entry_code));
+    const char *name      = gtk_editable_get_text(GTK_EDITABLE(w->entry_name));
+    const char *code      = gtk_editable_get_text(GTK_EDITABLE(w->entry_code));
     const char *brandName = gtk_editable_get_text(GTK_EDITABLE(w->entry_brandName));
-    const int quantity = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w->entry_quantity));
+    const int   quantity  = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w->entry_quantity));
 
     /* --- PONTO DE INJEÇÃO: validação de input --- */
     if (name[0] == '\0' || code[0] == '\0' || brandName[0] == '\0') {
@@ -223,10 +228,10 @@ static void onBtnUpdateClick(GtkWidget *widget, gpointer user_data)
         return;
     }
 
-    const char *name  = gtk_editable_get_text(GTK_EDITABLE(w->entry_name));
-    const char *code = gtk_editable_get_text(GTK_EDITABLE(w->entry_code));    
+    const char *name      = gtk_editable_get_text(GTK_EDITABLE(w->entry_name));
+    const char *code      = gtk_editable_get_text(GTK_EDITABLE(w->entry_code));
     const char *brandName = gtk_editable_get_text(GTK_EDITABLE(w->entry_brandName));
-    const int quantity = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w->entry_quantity));
+    const int   quantity  = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(w->entry_quantity));
 
     /* --- PONTO DE INJEÇÃO: validação e persistência --- */
     if (name[0] == '\0' || code[0] == '\0' || brandName[0] == '\0') {
@@ -279,8 +284,8 @@ static void on_row_selected(GtkListBox *lista, GtkListBoxRow *row,
     int n = allProducts(buf, MAX_PRODUCT);
     for (int i = 0; i < n; i++) {
         if (buf[i].id == id) {
-            gtk_editable_set_text(GTK_EDITABLE(w->entry_name),  buf[i].name);
-            gtk_editable_set_text(GTK_EDITABLE(w->entry_code), buf[i].code);
+            gtk_editable_set_text(GTK_EDITABLE(w->entry_name),      buf[i].name);
+            gtk_editable_set_text(GTK_EDITABLE(w->entry_code),      buf[i].code);
             gtk_editable_set_text(GTK_EDITABLE(w->entry_brandName), buf[i].brandName);
             gtk_spin_button_set_value(GTK_SPIN_BUTTON(w->entry_quantity), buf[i].quantity);
             break;
@@ -292,6 +297,57 @@ static void on_row_selected(GtkListBox *lista, GtkListBoxRow *row,
     view_set_status(w, msg);
 }
 
+/*
+ * onBtnSearchClick:
+ *   Lê o ID digitado em entry_search, chama searchProduct() e exibe
+ *   o resultado em label_resultado.
+ *
+ *   PONTEIROS: searchProduct() retorna Products* apontando para dentro
+ *   da estrutura interna do Model — NÃO chame free() nesse ponteiro.
+ *   A propriedade permanece com o Model.
+ *
+ *   Efeito colateral útil: se o produto for encontrado, o formulário
+ *   principal já é preenchido automaticamente, permitindo editar/remover
+ *   na sequência sem redigitar os dados.
+ */
+static void onBtnSearchClick(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    AppWidgets *w = (AppWidgets *)user_data;
+
+    const char *texto = gtk_editable_get_text(GTK_EDITABLE(w->entry_search));
+
+    if (texto[0] == '\0') {
+        gtk_label_set_text(GTK_LABEL(w->label_resultado),
+                           "Digite um ID para pesquisar.");
+        return;
+    }
+
+    /* strtol é preferível a atoi: detecta erros de conversão */
+    int id = (int)strtol(texto, NULL, 10);
+
+    Products *p = searchProduct(id);
+
+    if (p != NULL) {
+        char msg[MAX_STR * 4 + 64];
+        snprintf(msg, sizeof(msg),
+                 "✔ ID: %d | Nome: %s | Código: %s | Marca: %s | Qtd: %d",
+                 p->id, p->name, p->code, p->brandName, p->quantity);
+        gtk_label_set_text(GTK_LABEL(w->label_resultado), msg);
+
+        /* Preenche o formulário principal para edição imediata */
+        gtk_editable_set_text(GTK_EDITABLE(w->entry_name),      p->name);
+        gtk_editable_set_text(GTK_EDITABLE(w->entry_code),      p->code);
+        gtk_editable_set_text(GTK_EDITABLE(w->entry_brandName), p->brandName);
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(w->entry_quantity), p->quantity);
+        w->id_selecionado = p->id;
+    } else {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "✘ Nenhum produto com ID %d.", id);
+        gtk_label_set_text(GTK_LABEL(w->label_resultado), msg);
+    }
+}
+
 
 /* ===========================================================================
  *  SEÇÃO 5 — CONSTRUÇÃO DA INTERFACE (View Builder)
@@ -299,6 +355,34 @@ static void on_row_selected(GtkListBox *lista, GtkListBoxRow *row,
  *  No GTK, o layout é feito via código C; em projetos maiores você pode
  *  usar arquivos .ui (XML) processados pelo GtkBuilder — análogo ao JSX.
  * ===========================================================================*/
+
+
+/*  Carrega CSS externo (fora do arquivo principal) */
+static void applyCss()
+{
+    GtkCssProvider *provider = gtk_css_provider_new();
+
+    gtk_css_provider_load_from_path(provider, "main.css");
+
+    gtk_style_context_add_provider_for_display(
+        gdk_display_get_default(),
+        GTK_STYLE_PROVIDER(provider),
+        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
+
+    g_object_unref(provider);
+}
+
+static void activate(GtkApplication *app, gpointer user_data) {
+    GtkWidget *window = gtk_application_window_new(app);
+    gtk_window_set_title(GTK_WINDOW(window), "App com Ícone");
+    gtk_window_set_default_size(GTK_WINDOW(window), 400, 300);
+
+    gtk_window_set_icon_name(GTK_WINDOW(window), "com.meuapp.icone");
+
+    gtk_window_present(GTK_WINDOW(window));
+}
+
 
 /*
  * build_ui:
@@ -315,11 +399,20 @@ static void on_row_selected(GtkListBox *lista, GtkListBoxRow *row,
  *       ├── GtkSeparator
  *       ├── GtkBox horizontal (formulário)
  *       │   ├── GtkEntry (name)
- *       │   └── GtkEntry (code)
- *       ├── GtkBox horizontal (botões)
+ *       │   ├── GtkEntry (code)
+ *       │   ├── GtkEntry (brandName)
+ *       │   └── GtkSpinButton (quantity)
+ *       ├── GtkBox horizontal (botões CRUD)
  *       │   ├── GtkButton (Inserir)
  *       │   ├── GtkButton (Editar)
  *       │   └── GtkButton (Remover)
+ *       ├── GtkSeparator
+ *       ├── GtkLabel ("Pesquisa por ID")
+ *       ├── GtkBox horizontal (pesquisa)
+ *       │   ├── GtkEntry (entry_search)
+ *       │   └── GtkButton (btn_pesquisar)
+ *       ├── GtkLabel (label_resultado)
+ *       ├── GtkSeparator
  *       └── GtkLabel (status)
  */
 static void build_ui(GtkApplication *app, gpointer user_data)
@@ -335,13 +428,12 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     AppWidgets *w = g_new0(AppWidgets, 1);
     w->id_selecionado = -1;
 
-    /* O user_data aqui é NULL (não passamos nada no g_signal_connect abaixo) */
     (void)user_data;
 
     /* ----- Janela principal ----- */
     w->janela = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(w->janela), "Estoque em Árvore Binária em C com GTK 4 — Template MVC");
-    gtk_window_set_default_size(GTK_WINDOW(w->janela), 700, 520);
+    gtk_window_set_default_size(GTK_WINDOW(w->janela), 700, 580);
 
     /* ----- Container raiz vertical (análogo a <div class="flex flex-col">) ----- */
     GtkWidget *vbox_raiz = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
@@ -354,7 +446,7 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     /* ----- Título ----- */
     GtkWidget *lbl_titulo = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(lbl_titulo),
-                         "<span size='large' weight='bold'>📋 Gerenciador de Registros</span>");
+                         "<span size='large' weight='bold'>Gerenciador de Estoque</span>");
     gtk_widget_set_halign(lbl_titulo, GTK_ALIGN_START);
     gtk_box_append(GTK_BOX(vbox_raiz), lbl_titulo);
 
@@ -362,33 +454,23 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     gtk_box_append(GTK_BOX(vbox_raiz), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
 
     /* ----- Área rolável + lista ----- */
-    /*
-     * GtkScrolledWindow — análogo a <div style="overflow-y: scroll; height: 250px">
-     * gtk_widget_set_vexpand(TRUE) → flex-grow: 1 (ocupa espaço disponível)
-     */
     GtkWidget *scroll = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
                                    GTK_POLICY_AUTOMATIC,
                                    GTK_POLICY_AUTOMATIC);
     gtk_widget_set_vexpand(scroll, TRUE);
-    gtk_widget_set_size_request(scroll, -1, 200); /* altura mínima */
+    gtk_widget_set_size_request(scroll, -1, 200);
     gtk_box_append(GTK_BOX(vbox_raiz), scroll);
 
-    /*
-     * GtkListBox — análogo a <ul> com seleção de linha.
-     * GTK_SELECTION_SINGLE = só um item selecionável por vez.
-     */
     w->lista_box = gtk_list_box_new();
     gtk_list_box_set_selection_mode(GTK_LIST_BOX(w->lista_box),
                                     GTK_SELECTION_SINGLE);
     gtk_list_box_set_show_separators(GTK_LIST_BOX(w->lista_box), TRUE);
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), w->lista_box);
 
-    /* Conecta o sinal de seleção de linha — análogo a addEventListener('click') */
     g_signal_connect(w->lista_box, "row-selected",
                      G_CALLBACK(on_row_selected), w);
 
-    /* Separador visual antes do formulário */
     gtk_box_append(GTK_BOX(vbox_raiz), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
 
     /* ----- Rótulo do formulário ----- */
@@ -401,70 +483,45 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     GtkWidget *hbox_form = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_append(GTK_BOX(vbox_raiz), hbox_form);
 
-    /* Campo name (análogo a <input type="text" placeholder="name"> */
     w->entry_name = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_name), "name");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_name), "Nome");
     gtk_widget_set_hexpand(w->entry_name, TRUE);
     gtk_box_append(GTK_BOX(hbox_form), w->entry_name);
 
-    /* Campo E-mail */
     w->entry_code = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_code), "E-mail");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_code), "Código / Série");
     gtk_widget_set_hexpand(w->entry_code, TRUE);
-    gtk_box_append(GTK_BOX(hbox_form), w->entry_code);    
-    
-    
-    /* Campo Brand Name */
+    gtk_box_append(GTK_BOX(hbox_form), w->entry_code);
+
     w->entry_brandName = gtk_entry_new();
     gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_brandName), "Marca");
     gtk_widget_set_hexpand(w->entry_brandName, TRUE);
     gtk_box_append(GTK_BOX(hbox_form), w->entry_brandName);
-    
 
-
-    // 1. Criamos o input definindo: (valor_mínimo, valor_máximo, passo_do_incremento)
-    // Exemplo: vai de 0 a 999, e aumenta de 1 em 1 a cada clique no "+"
     w->entry_quantity = gtk_spin_button_new_with_range(0, 999, 1);
-    // 2. (Opcional) Configurações extras de comportamento:
-    // Garante que o usuário só consiga digitar números (bloqueia letras se ele tentar digitar)
     gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(w->entry_quantity), TRUE);
-    // Faz o campo ser "clonado" ou atualizado apenas com valores inteiros (sem casas decimais)
     gtk_spin_button_set_digits(GTK_SPIN_BUTTON(w->entry_quantity), 0);
     gtk_box_append(GTK_BOX(hbox_form), w->entry_quantity);
 
-
-
-    /* ----- Linha de botões ----- */
+    /* ----- Linha de botões CRUD ----- */
     GtkWidget *hbox_btns = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_box_append(GTK_BOX(vbox_raiz), hbox_btns);
 
-    /* Botão Inserir */
-    w->btn_inserir = gtk_button_new_with_label("➕ Inserir");
-    gtk_widget_add_css_class(w->btn_inserir, "suggested-action"); /* cor de destaque */
+    w->btn_inserir = gtk_button_new_with_label("Inserir");
+    gtk_widget_add_css_class(w->btn_inserir, "btn-successfull");
     gtk_widget_set_hexpand(w->btn_inserir, TRUE);
     gtk_box_append(GTK_BOX(hbox_btns), w->btn_inserir);
 
-    /* Botão Editar */
     w->btn_editar = gtk_button_new_with_label("✏ Editar");
+    gtk_widget_add_css_class(w->btn_editar, "btn-update");
     gtk_widget_set_hexpand(w->btn_editar, TRUE);
     gtk_box_append(GTK_BOX(hbox_btns), w->btn_editar);
 
-    /* Botão Remover */
     w->btn_remover = gtk_button_new_with_label("🗑 Remover");
-    gtk_widget_add_css_class(w->btn_remover, "destructive-action"); /* cor vermelha */
+    gtk_widget_add_css_class(w->btn_remover, "destructive-action");
     gtk_widget_set_hexpand(w->btn_remover, TRUE);
     gtk_box_append(GTK_BOX(hbox_btns), w->btn_remover);
 
-    /*
-     * Conecta os sinais dos botões.
-     * g_signal_connect(objeto, "name-do-sinal", G_CALLBACK(handler), dado_extra)
-     *   ↕ equivalente JS:
-     * objeto.addEventListener("name-do-sinal", handler)
-     *   (o 'dado_extra' é como fechar sobre variáveis com uma closure JS)
-     *
-     * PONTEIROS: passamos 'w' como user_data — os callbacks receberão este
-     * ponteiro. Ele deve viver enquanto a janela existir (ver on_janela_destroy).
-     */
     g_signal_connect(w->btn_inserir, "clicked",
                      G_CALLBACK(onBtnInsertClick), w);
     g_signal_connect(w->btn_editar,  "clicked",
@@ -472,7 +529,46 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     g_signal_connect(w->btn_remover, "clicked",
                      G_CALLBACK(onBtnRemoveClick), w);
 
-    /* Separador antes do status */
+    /* ----- Separador antes da pesquisa ----- */
+    gtk_box_append(GTK_BOX(vbox_raiz), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
+
+    /* ----- Seção de pesquisa por ID ----- */
+    /*
+     * Análogo a um <section id="search"> com um <input> + <button> + <p>.
+     *
+     * entry_search  → campo de texto onde o usuário digita o ID.
+     * btn_pesquisar → dispara onBtnSearchClick.
+     * label_resultado → exibe o produto encontrado (ou mensagem de erro).
+     *
+     * PONTEIROS: searchProduct() retorna Products* apontando para dentro
+     * do Model — . O formulário principal é preenchido
+     * automaticamente quando o produto é encontrado.
+     */
+    GtkWidget *lbl_search = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(lbl_search), "<b>Pesquisa por ID</b>");
+    gtk_widget_set_halign(lbl_search, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(vbox_raiz), lbl_search);
+
+    GtkWidget *hbox_search = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_box_append(GTK_BOX(vbox_raiz), hbox_search);
+
+    w->entry_search = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_search), "ID do produto");
+    gtk_widget_set_hexpand(w->entry_search, TRUE);
+    gtk_box_append(GTK_BOX(hbox_search), w->entry_search);
+
+    w->btn_pesquisar = gtk_button_new_with_label("Pesquisar pelo ID");
+    gtk_box_append(GTK_BOX(hbox_search), w->btn_pesquisar);
+
+    g_signal_connect(w->btn_pesquisar, "clicked",
+                     G_CALLBACK(onBtnSearchClick), w);
+
+    w->label_resultado = gtk_label_new("");
+    gtk_label_set_wrap(GTK_LABEL(w->label_resultado), TRUE);
+    gtk_widget_set_halign(w->label_resultado, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(vbox_raiz), w->label_resultado);
+
+    /* ----- Separador antes do status ----- */
     gtk_box_append(GTK_BOX(vbox_raiz), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL));
 
     /* ----- Label de status (análogo a <p id="status-bar">) ----- */
@@ -488,12 +584,12 @@ static void build_ui(GtkApplication *app, gpointer user_data)
      *
      * MEMÓRIA: isso substitui um callback on_destroy manual e garante
      * que não haverá leak mesmo que o usuário feche a janela pelo 'X'.
-     * Análogo ao padrão RAII em C++ ou ao finally de um try/finally JS.
      */
     g_object_set_data_full(G_OBJECT(w->janela), "app-widgets", w, g_free);
 
     /* Popula a lista inicial e exibe a janela */
     viewListAllProducts(w);
+    applyCss();
     gtk_widget_set_visible(w->janela, TRUE);
 }
 
@@ -523,8 +619,6 @@ int main(int argc, char *argv[])
 
     /*
      * Inicia o loop de eventos e bloqueia até a janela ser fechada.
-     * Análogo ao event loop do Node.js / navegador.
-     *
      * g_application_run() retorna o código de saída (0 = sucesso).
      */
     int status = g_application_run(G_APPLICATION(app), argc, argv);
