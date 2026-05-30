@@ -306,7 +306,7 @@ static void on_row_selected(GtkListBox *lista, GtkListBoxRow *row,
  *   da estrutura interna do Model — NÃO chame free() nesse ponteiro.
  *   A propriedade permanece com o Model.
  *
- *   Efeito colateral útil: se o produto for encontrado, o formulário
+ *   Efeito colateral útil: se a peça for encontrado, o formulário
  *   principal já é preenchido automaticamente, permitindo editar/remover
  *   na sequência sem redigitar os dados.
  */
@@ -343,7 +343,7 @@ static void onBtnSearchClick(GtkWidget *widget, gpointer user_data)
         w->id_selecionado = p->id;
     } else {
         char msg[64];
-        snprintf(msg, sizeof(msg), "✘ Nenhum produto com ID %d.", id);
+        snprintf(msg, sizeof(msg), "Nenhuma peça com ID %d.", id);
         gtk_label_set_text(GTK_LABEL(w->label_resultado), msg);
     }
 }
@@ -432,7 +432,7 @@ static void build_ui(GtkApplication *app, gpointer user_data)
 
     /* ----- Janela principal ----- */
     w->janela = gtk_application_window_new(app);
-    gtk_window_set_title(GTK_WINDOW(w->janela), "Estoque em Árvore Binária em C com GTK 4 — Template MVC");
+    gtk_window_set_title(GTK_WINDOW(w->janela), "Controle de Peças em Árvore B em C com GTK 4 — Template MVC");
     gtk_window_set_default_size(GTK_WINDOW(w->janela), 700, 580);
 
     /* ----- Container raiz vertical (análogo a <div class="flex flex-col">) ----- */
@@ -446,7 +446,7 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     /* ----- Título ----- */
     GtkWidget *lbl_titulo = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(lbl_titulo),
-                         "<span size='large' weight='bold'>Gerenciador de Estoque</span>");
+                         "<span size='large' weight='bold'>Controle de Peças</span>");
     gtk_widget_set_halign(lbl_titulo, GTK_ALIGN_START);
     gtk_box_append(GTK_BOX(vbox_raiz), lbl_titulo);
 
@@ -538,11 +538,11 @@ static void build_ui(GtkApplication *app, gpointer user_data)
      *
      * entry_search  → campo de texto onde o usuário digita o ID.
      * btn_pesquisar → dispara onBtnSearchClick.
-     * label_resultado → exibe o produto encontrado (ou mensagem de erro).
+     * label_resultado → exibe a peça encontrado (ou mensagem de erro).
      *
      * PONTEIROS: searchProduct() retorna Products* apontando para dentro
      * do Model — . O formulário principal é preenchido
-     * automaticamente quando o produto é encontrado.
+     * automaticamente quando a peça é encontrado.
      */
     GtkWidget *lbl_search = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(lbl_search), "<b>Pesquisa por ID</b>");
@@ -553,7 +553,7 @@ static void build_ui(GtkApplication *app, gpointer user_data)
     gtk_box_append(GTK_BOX(vbox_raiz), hbox_search);
 
     w->entry_search = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_search), "ID do produto");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(w->entry_search), "ID da peça");
     gtk_widget_set_hexpand(w->entry_search, TRUE);
     gtk_box_append(GTK_BOX(hbox_search), w->entry_search);
 
